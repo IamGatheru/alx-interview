@@ -1,50 +1,54 @@
 #!/usr/bin/python3
+
 """
-log parsing
+Script reads stdin line by line and computes metrics.
 """
 
 import sys
-import re
 
 
-def output(log: dict) -> None:
-    """
-    helper function to display stats
-    """
-    print("File size: {}".format(log["file_size"]))
-    for code in sorted(log["code_frequency"]):
-        if log["code_frequency"][code]:
-            print("{}: {}".format(code, log["code_frequency"][code]))
+line_count = 0
+total_file_size = 0
 
+status_code = {
+    "200": 0, "301": 0,
+    "400": 0, "401": 0,
+    "403": 0, "404": 0,
+    "405": 0, "500": 0
+    }
 
-if __name__ == "__main__":
-    regex = re.compile(
-    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} - \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d+\] "GET /projects/260 HTTP/1.1" (.{3}) (\d+)')  # nopep8
+try:
+    for line in sys.stdin:
+        args = line.split(' ')
 
-    line_count = 0
-    log = {}
-    log["file_size"] = 0
-    log["code_frequency"] = {
-        str(code): 0 for code in [
-            200, 301, 400, 401, 403, 404, 405, 500]}
+        if len(args) > 2:
+            status_line = args[-2]
+            file_size = args[-1]
 
-    try:
-        for line in sys.stdin:
-            line = line.strip()
-            match = regex.fullmatch(line)
-            if (match):
-                line_count += 1
-                code = match.group(1)
-                file_size = int(match.group(2))
+            if status_line in status_code:
+                status_code[status_line] += 1
+            total_file_size += int(file_size)
+            line_count += 1
 
-                # File size
-                log["file_size"] += file_size
+            if line_count == 10:
+                print('File size: {:d}'.format(total_file_size))
+                sorted_keys = sorted(status_code.keys())
 
-                # status code
-                if (code.isdecimal()):
-                    log["code_frequency"][code] += 1
+                for key in sorted_keys:
+                    value = status_code[key]
 
-                if (line_count % 10 == 0):
-                    output(log)
-    finally:
-        output(log)
+                    if value != 0:
+                        print('{}: {}'.format(key, value))
+                    line_count = 0
+
+except KeyboardInterrupt:
+    print("\nProcess was interrupted by user")
+
+finally:
+    print("File size: {:d}".format(total_file_size))
+    sorted_keys = sorted(status_code.keys())
+
+    for key in sorted_keys:
+        value = status_code[key]
+        if value != 0:
+            print("{}: {}".format(key, value))
